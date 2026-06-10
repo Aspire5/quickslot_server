@@ -1,5 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// ──────────────────────────────────────────────────────────
+// QuickSlot — Prisma Schema (PostgreSQL)
+// ──────────────────────────────────────────────────────────
 
 generator client {
   provider = "prisma-client-js"
@@ -8,4 +9,65 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ───────────── User ─────────────
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  firstName String   @map("first_name") @db.VarChar(100)
+  lastName  String?  @map("last_name") @db.VarChar(100)
+  username  String   @unique @db.VarChar(60)
+  password  String   @db.VarChar(255) 
+  createdAt DateTime @default(now()) @map("created_at")
+
+  bookings Booking[]
+
+  @@map("users")
+}
+
+// ───────────── Venue ─────────────
+model Venue {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(150)
+  location  String?  @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  slots Slot[]
+
+  @@map("venues")
+}
+
+// ───────────── Slot ─────────────
+// Each slot represents a bookable window at a venue - currently of 1 hour each
+// The composite unique constraint on (venueId, startAt) prevents
+// duplicate slots for the same venue and time.
+model Slot {
+  id      String   @id @default(uuid()) @db.Uuid
+  venueId String   @map("venue_id") @db.Uuid
+  startAt DateTime @map("start_at")
+  endAt   DateTime @map("end_at")
+
+  venue   Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  booking Booking? // One-to-one: a slot can have at most one booking
+
+  @@unique([venueId, startAt], map: "uq_slot_venue_start")
+  @@index([venueId, startAt], map: "idx_slot_venue_start")
+  @@map("slots")
+}
+
+// ───────────── Booking ─────────────
+// The UNIQUE constraint on slotId is the critical guard against
+// double-booking: PostgreSQL will reject any second INSERT for
+// the same slotId, even under concurrent transactions.
+model Booking {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  slotId    String   @unique @map("slot_id") @db.Uuid // ← enforces one booking per slot at database level
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slot Slot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_booking_user")
+  @@map("bookings")
 }
