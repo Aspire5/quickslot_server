@@ -25,14 +25,17 @@ const SLOT_END_HOUR = 22;
 
 function buildSlotsForDate(venueId, date) {
   const slots = [];
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // 5.5 hours in ms
+
   for (let hour = SLOT_START_HOUR; hour < SLOT_END_HOUR; hour++) {
     const startAt = new Date(date);
     startAt.setUTCHours(hour, 0, 0, 0);
 
-    const endAt = new Date(date);
-    endAt.setUTCHours(hour + 1, 0, 0, 0);
+    // Shift UTC time back by 5.5 hours to align 6:00 AM - 10:00 PM local time
+    const startAtLocal = new Date(startAt.getTime() - IST_OFFSET_MS);
+    const endAtLocal = new Date(startAtLocal.getTime() + 60 * 60 * 1000); // 1 hour duration
 
-    slots.push({ venueId, startAt, endAt });
+    slots.push({ venueId, startAt: startAtLocal, endAt: endAtLocal });
   }
   return slots;
 }
