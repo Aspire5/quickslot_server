@@ -1,26 +1,27 @@
 import express from 'express';
 import cors from 'cors';
 import healthRouter from './routes/health.route.js';
+import authRouter from './routes/auth.route.js';
+import venueRouter from './routes/venue.route.js';
+import bookingRouter from './routes/booking.route.js';
+import userRouter from './routes/user.route.js';
+import { auth } from './middlewares/auth.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 
 const app = express();
 
-// Apply Middlewares
-// HACKATHON SETUP: Allow all origins. 
-// PRODUCTION RESTRICTION: To restrict origins later, pass config:
-// app.use(cors({
-//   origin: ['http://localhost:3000', 'https://yourdomain.com'],
-//   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-//   credentials: true
-// }));
-app.use(cors()); 
-
+app.use(cors());
 app.use(express.json());
 
-// Routes
+// public routes
 app.use('/api/v1/health', healthRouter);
+app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/venues', venueRouter);
 
-// Global Centralized Error Handler Middleware
+// protected routes — require valid JWT
+app.use('/api/v1/bookings', auth, bookingRouter);
+app.use('/api/v1/users', auth, userRouter);
+
 app.use(errorHandler);
 
 export default app;
