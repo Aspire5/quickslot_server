@@ -4,6 +4,8 @@ The Node.js and Express backend server for the QuickSlot sports booking system. 
 
 The system leverages database-level constraints with Prisma and PostgreSQL to ensure double-booking prevention under highly concurrent loads.
 
+---
+
 ## 🛠 Tech Stack
 
 - **Runtime Environment:** Node.js
@@ -14,14 +16,65 @@ The system leverages database-level constraints with Prisma and PostgreSQL to en
 
 ---
 
-## 💾 Database Schema
+## 💾 Database Schema & Relations
 
-The database model is structured to guarantee consistency and concurrency safety:
+### Tabular Schema Details
 
-- **`User`:** Stores user credentials and profile details.
-- **`Venue`:** Represents the turfs or courts available for bookings.
-- **`Slot`:** Individual 1-hour bookable slots. A composite unique index on `(venue_id, start_at)` prevents duplicate slots from being generated for the same venue at the same time.
-- **`Booking`:** Maps a `User` to a `Slot`. The field `slot_id` has a `UNIQUE` constraint, which serves as the primary guard against double-booking. PostgreSQL will immediately reject concurrent duplicate bookings at the transaction level, preventing race conditions.
+#### 1. User (`users`)
+| Field | Type | Key / Constraint | Description |
+|---|---|---|---|
+| `id` | UUID | `PRIMARY KEY` | Unique identifier for each user |
+| `firstName` | VarChar(100) | `@map("first_name")` | First name of the user |
+| `lastName` | VarChar(100)? | `@map("last_name")` | Optional last name of the user |
+| `username` | VarChar(60) | `UNIQUE` | Unique login handle |
+| `password` | VarChar(255) | | Bcrypt-hashed password |
+| `createdAt` | DateTime | `@default(now())`, `@map("created_at")` | Creation timestamp |
+
+#### 2. Venue (`venues`)
+| Field | Type | Key / Constraint | Description |
+|---|---|---|---|
+| `id` | UUID | `PRIMARY KEY` | Unique identifier for each venue |
+| `name` | VarChar(150) | | Name of the court, turf, or center |
+| `location` | VarChar(255)? | | Location address |
+| `createdAt` | DateTime | `@default(now())`, `@map("created_at")` | Creation timestamp |
+
+#### 3. Slot (`slots`)
+| Field | Type | Key / Constraint | Description |
+|---|---|---|---|
+| `id` | UUID | `PRIMARY KEY` | Unique identifier for each time block |
+| `venueId` | UUID | `FOREIGN KEY` | Maps to `Venue.id` |
+| `startAt` | DateTime | `@map("start_at")` | Slot starting time (UTC) |
+| `endAt` | DateTime | `@map("end_at")` | Slot ending time (UTC) |
+
+- **Composite Unique Index:** `@@unique([venueId, startAt])` prevents creating duplicate timeslots for the same venue at the same time.
+
+#### 4. Booking (`bookings`)
+| Field | Type | Key / Constraint | Description |
+|---|---|---|---|
+| `id` | UUID | `PRIMARY KEY` | Unique identifier for each booking |
+| `userId` | UUID | `FOREIGN KEY` | Maps to `User.id` |
+| `slotId` | UUID | `FOREIGN KEY`, `UNIQUE` | Maps to `Slot.id` |
+| `createdAt` | DateTime | `@default(now())`, `@map("created_at")` | Booking registration timestamp |
+
+- **One Booking per Slot Constraint:** The `UNIQUE` constraint on `slotId` enforces that a slot cannot be booked by more than one user. PostgreSQL automatically rolls back concurrent insert requests on the same slot to prevent race conditions.
+
+### Relational Schema Map
+
+```
+   ┌───────────┐                 ┌──────────────┐
+   │   User    │ (1) ─────── (*) │   Booking    │
+   └───────────┘                 └──────┬───────┘
+                                        │ (1)
+                                        │
+                                        │ (1)
+   ┌───────────┐                 ┌──────┴───────┐
+   │   Venue   │ (1) ─────── (*) │     Slot     │
+   └───────────┘                 └──────────────┘
+```
+
+- **User to Booking (One-to-Many):** A User can make multiple bookings (`User.id` ──> `Booking.userId`).
+- **Venue to Slot (One-to-Many):** A Venue can contain multiple 1-hour slots (`Venue.id` ──> `Slot.venueId`).
+- **Slot to Booking (One-to-One):** A Slot can have at most one active Booking (`Slot.id` <──> `Booking.slotId` [Unique]).
 
 ---
 
@@ -92,3 +145,25 @@ All endpoints are prefixed with `/api/v1`.
 1. **WebSocket Integration:** Replace client-side HTTP polling with WebSockets (using `socket.io`) to push real-time slot booking states instantly to all connected clients.
 2. **Expired Slots Backend Validation:** Filter out slots whose start times have already passed directly in the Prisma/SQL query layer, instead of returning the full 24-hour day schedule to the client and delegating expired filtering to the frontend view logic.
 3. **API Rate Limiting:** Implement middleware (like `express-rate-limit`) to prevent abuse on booking and authentication endpoints.
+
+---
+
+## 🤖 Use of AI
+
+I used AI heavily to build this project. Specifically:
+- **Antigravity** was used for code generation, file modifications, running tests, and debugging in the workspace.
+- **ChatGPT** was used to validate my core logic details, generate development prompts and clear any general doubts.
+
+---
+
+## 💻 Process of Building via AI
+
+My build process involved the following structured steps:
+1. **Requirements Gathering:** Documented and organized software requirements specifications on my notepad.
+2. **Feature Selection:** Selected the precise set of features that I wanted to integrate.
+3. **Architecture Planning:** Sketched out the database schema, normalized entities, and mapped their logical relations.
+4. **AI Consultation:** Discussed and argued ideas with ChatGPT, asking it to look for architectural flaws, validate new ideas, and point out edge cases I might have missed.
+5. **Schema Setup:** Once finalized, generated a multi-phase implementation plan to deploy the Prisma schema, set up relations, and accepted the correct code edits generated by Antigravity in real-time.
+6. **API Flow Drafting & Prompting:** Discussed API endpoint structures and payloads with ChatGPT to save Antigravity context tokens. I then had ChatGPT generate structured prompts summarizing the designs, verified them, applied manual edits, and input them to Antigravity to perform code modifications.
+7. **Backend as Reference:** Once the backend server was verified, used it as a strict reference contract to write the frontend, ensuring the API parsing structure matches exactly.
+8. **Deployment:** Manually deployed the backend instance to Railway, configured env variables, and verified that everything connected successfully.
