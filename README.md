@@ -154,6 +154,12 @@ I used AI heavily to build this project. Specifically:
 - **Antigravity** was used for code generation, file modifications, running tests, and debugging in the workspace.
 - **ChatGPT** was used to validate my core logic details, generate development prompts and clear any general doubts.
 
+ - One thing it got wrong that I caught and fixed :- One issue I noticed was that the AI initially used an int datatype to store slot timings like startAt and endAt, assuming a 24-hour format (e.g., 6 for 6 AM).
+
+This approach works for fixed 1-hour slots but isn’t scalable if we want to support flexible durations like 30 or 90 minutes.
+
+So I refactored it to use DateTime, which allows more precise and flexible time handling, and makes the system easier to extend in the future.
+
 ---
 
 ## 💻 Process of Building via AI
